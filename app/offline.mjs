@@ -119,6 +119,10 @@ export async function searchOfflineAddresses(input, limit = 8) {
   const graph = await loadGraph();
   const query = normalize(input);
   if (query.length < 3) return [];
+  const toResult = (address) => { const [lat, lon] = graph.nodes[address.i]; const displayName = [address.n, address.s, address.p, address.c].filter(Boolean).join(', '); return { input: displayName, display_name: displayName, lat, lon, street: address.s, number: address.n, postcode: address.p, city: address.c }; };
+  const postcodeQuery = query.replace(/\s/g, '');
+  const postcodeMatches = graph.addressesNormalized.filter((address) => normalize(address.p).replace(/\s/g, '') === postcodeQuery);
+  if (postcodeMatches.length) return postcodeMatches.sort((a, b) => String(a.n).localeCompare(String(b.n), undefined, { numeric: true })).map(toResult).slice(0, Math.max(limit, postcodeMatches.length));
   const terms = query.split(' ').filter(Boolean);
   const editDistance = (left, right) => {
     const row = Array.from({ length: right.length + 1 }, (_, index) => index);
@@ -136,7 +140,7 @@ export async function searchOfflineAddresses(input, limit = 8) {
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || a.address.key.localeCompare(b.address.key))
     .slice(0, limit)
-    .map(({ address }) => { const [lat, lon] = graph.nodes[address.i]; const displayName = [address.n, address.s, address.p, address.c].filter(Boolean).join(', '); return { input: displayName, display_name: displayName, lat, lon, street: address.s, number: address.n, postcode: address.p, city: address.c }; });
+    .map(({ address }) => toResult(address));
 }
 
 export async function calculateOfflineRoute(points, returnStart = false) {
