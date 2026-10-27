@@ -130,7 +130,11 @@ export async function resolveOfflineAddress(input) {
   const graph = await loadGraph();
   const query = normalize(input);
   const exact = graph.addressByKey.get(query) || graph.addressesNormalized.find((address) => query.includes(normalize(`${address.n} ${address.s}`)));
-  if (!exact) throw new Error(`Adresa nu există în indexul offline Devon: ${input}. Alege locația direct de pe hartă sau valideaz-o online o singură dată.`);
+  if (!exact) {
+    const postcode = (await loadOfflinePostcodes()).byKey.get(query.replace(/\s/g, ''));
+    if (postcode) return { lat: postcode.lat, lon: postcode.lon, input, display_name: `${postcode.p} · punct postcode`, postcode: postcode.p, city: 'Devon', countryCode: 'gb', needsReview: true, postcodeOnly: true, offline: true };
+    throw new Error(`Adresa nu există în indexul offline Devon: ${input}. Alege locația direct de pe hartă sau valideaz-o online o singură dată.`);
+  }
   const [lat, lon] = graph.nodes[exact.i];
   const displayName = [exact.n, exact.s, exact.p, exact.c].filter(Boolean).join(', ');
   return { lat, lon, input, display_name: displayName, postcode: exact.p || '', city: exact.c || 'Devon', countryCode: 'gb', needsReview: false, offline: true };
