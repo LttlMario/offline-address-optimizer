@@ -73,9 +73,11 @@ async function optimize() {
     const start = startOverride || await resolveOfflineAddress($('start-address').value);
     const finish = $('finish-address').value.trim() ? await resolveOfflineAddress($('finish-address').value) : null;
     const allPoints = [start, ...stops, ...(finish ? [finish] : [])];
+    const addressKeys = allPoints.map((point) => normalize(point.display_name || point.address || '').toLocaleLowerCase());
+    const duplicateAddresses = addressKeys.filter((key, index) => key && addressKeys.indexOf(key) !== index);
+    if (duplicateAddresses.length) throw new Error('Există aceeași adresă de mai multe ori. Elimină duplicatul înainte de optimizare.');
     const pointKeys = allPoints.map((point) => `${Number(point.lat).toFixed(6)},${Number(point.lon).toFixed(6)}`);
-    const duplicates = pointKeys.filter((key, index) => pointKeys.indexOf(key) !== index);
-    if (duplicates.length) throw new Error('Există adrese cu aceeași locație. Elimină duplicatele înainte de optimizare.');
+    const sharedPoints = pointKeys.filter((key, index) => pointKeys.indexOf(key) !== index).length;
     if (allPoints.length > 250) { $('notice').textContent = `Se calculează o rută mare cu ${allPoints.length} puncte; pagina rămâne deschisă până la final.`; }
     const selected = [start, ...stops];
     const result = await calculateOfflineRoute(selected);
@@ -92,7 +94,8 @@ async function optimize() {
     $('start-address').value = routeStops[0]?.address || '';
     if (finalAddress) $('finish-address').value = routeStops.at(-1)?.address || '';
     if (routeLayer) routeLayer.remove(); routeLayer = L.geoJSON(result.geometry, { style: { color: '#31e0ad', weight: 5, opacity: .9 } }).addTo(map); map.fitBounds(routeLayer.getBounds(), { padding: [18, 18] });
-    $('notice').className = 'notice ok'; $('notice').textContent = `Traseu offline calculat: ${(result.distance / 1000).toFixed(2)} km, aproximativ ${Math.max(1, Math.round(result.duration / 60))} ${Math.max(1, Math.round(result.duration / 60)) === 1 ? 'minut' : 'minute'}.`; renderStops();
+    const sharedMessage = sharedPoints ? ` ${sharedPoints} adrese împart același punct de hartă.` : '';
+    $('notice').className = 'notice ok'; $('notice').textContent = `Traseu offline calculat: ${(result.distance / 1000).toFixed(2)} km, aproximativ ${Math.max(1, Math.round(result.duration / 60))} ${Math.max(1, Math.round(result.duration / 60)) === 1 ? 'minut' : 'minute'}.${sharedMessage}`; renderStops();
   } catch (error) { $('notice').className = 'notice error'; $('notice').textContent = error.message; }
 }
 
