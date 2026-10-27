@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#10231f">
   <title>Offline Address Optimizer</title>
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="leaflet.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -23,6 +24,12 @@
       <select id="finish"><option value="">Ultima oprire optimizată</option></select>
       <button id="optimize" class="primary">Optimizează ordinea</button>
       <button id="clear" class="quiet">Golește</button>
+      <button id="load-map" class="quiet">Încarcă harta offline</button>
+    </section>
+
+    <section class="card map-card">
+      <div class="row"><h2>Harta offline Devon</h2><span id="map-status" class="muted">pregătită pentru încărcare</span></div>
+      <div id="map"></div>
     </section>
 
     <section class="card">
@@ -37,6 +44,7 @@
       <p id="notice" class="notice">Pentru optimizare offline, adresele trebuie să aibă coordonate în pachetul local de hartă.</p>
     </section>
   </main>
+  <script src="leaflet.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

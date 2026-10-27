@@ -20,7 +20,7 @@ Repository-ul [mapsme/omim](https://github.com/mapsme/omim) este folosit ca refe
 
 ## Stare
 
-Prima versiune stabilește nucleul de optimizare independent de interfața de hartă. Următorul pas este pachetul de hartă offline pentru zonele necesare și indexul complet de adrese.
+Versiunea publicată include harta rutieră Devon, indexul local de adrese și rutare locală pe graful offline. La prima deschidere trebuie lăsată aplicația să descarce pachetul; după aceea harta și optimizarea Devon pot funcționa fără internet.
 
 ## Pornire locală
 
