@@ -6,7 +6,7 @@
     "android:add": "cap add android",
     "android:sync": "cap sync android",
     "android:build": "cap sync android && cd android && gradlew.bat assembleDebug",
-    "check": "node --check app/app.js && node --check app/search.js && node --check app/offline.mjs && node verify.mjs"
+    "check": "node --check app/app.js && node --check app/search.js && node --check app/offline.mjs && node verify.mjs && node verify-route.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",

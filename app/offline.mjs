@@ -173,13 +173,9 @@ export async function searchOfflineAddresses(input, limit = 8, options = {}) {
     .map(({ address }) => toResult(address));
 }
 
-export async function calculateOfflineRoute(points, returnStart = false) {
-  const graph = await loadGraph();
-  const snapped = points.map((point) => nearestNode(graph, Number(point.lat), Number(point.lon)));
-  const remaining = new Set(points.slice(1).map((_, index) => index + 1));
+function greedyOrder(graph, snapped) {
+  const remaining = new Set(snapped.slice(1).map((_, index) => index + 1));
   const order = [0];
-  const geometry = [];
-  let distance = 0;
   let current = 0;
   while (remaining.size) {
     const result = dijkstra(graph, snapped[current].index, [...remaining].map((index) => snapped[index].index));
@@ -187,24 +183,74 @@ export async function calculateOfflineRoute(points, returnStart = false) {
     let best = Infinity;
     remaining.forEach((index) => { const value = result.distances.get(snapped[index].index) ?? Infinity; if (value < best) { best = value; next = index; } });
     if (next < 0 || !Number.isFinite(best)) throw new Error('Nu există legătură rutieră offline între toate locațiile.');
-    const segment = pathFor(result.previous, snapped[current].index, snapped[next].index);
-    if (!geometry.length) geometry.push(...segment); else geometry.push(...segment.slice(1));
-    distance += best;
     order.push(next);
     remaining.delete(next);
     current = next;
   }
-  if (returnStart) {
-    const result = dijkstra(graph, snapped[current].index, [snapped[0].index]);
-    const best = result.distances.get(snapped[0].index) ?? Infinity;
-    if (!Number.isFinite(best)) throw new Error('Nu există drum offline de revenire la plecare.');
-    const segment = pathFor(result.previous, snapped[current].index, snapped[0].index);
-    geometry.push(...segment.slice(1));
-    distance += best;
-    order.push(0);
+  return order;
+}
+
+function routeForOrder(graph, snapped, order, returnStart = false) {
+  const geometry = [];
+  let distance = 0;
+  const fullOrder = returnStart ? [...order, 0] : order.slice();
+  for (let index = 0; index < fullOrder.length - 1; index += 1) {
+    const from = fullOrder[index];
+    const to = fullOrder[index + 1];
+    const result = dijkstra(graph, snapped[from].index, [snapped[to].index]);
+    const segmentDistance = result.distances.get(snapped[to].index) ?? Infinity;
+    if (!Number.isFinite(segmentDistance)) throw new Error(returnStart ? 'Nu există drum offline de revenire la plecare.' : 'Nu există legătură rutieră offline între toate locațiile.');
+    const segment = pathFor(result.previous, snapped[from].index, snapped[to].index);
+    if (!segment.length) throw new Error('Nu există geometrie offline pentru segmentul selectat.');
+    if (!geometry.length) geometry.push(...segment); else geometry.push(...segment.slice(1));
+    distance += segmentDistance;
   }
-  const coordinates = geometry.map((index) => [graph.nodes[index][1], graph.nodes[index][0]]);
-  return { order, distance, duration: distance / 8.3, geometry: { type: 'LineString', coordinates }, provider: 'Offline Devon', snappedMeters: snapped.map((point) => point.distance) };
+  return { order: fullOrder, distance, geometry };
+}
+
+function straightDistance(left, right) {
+  const dy = (Number(right.lat) - Number(left.lat)) * 110540;
+  const dx = (Number(right.lon) - Number(left.lon)) * Math.cos((Number(left.lat) + Number(right.lat)) * Math.PI / 360) * 111320;
+  return Math.hypot(dx, dy);
+}
+
+function improveOrder2Opt(points, order) {
+  if (order.length < 4 || order.length > 100) return order;
+  const improved = order.slice();
+  let changed = true;
+  let pass = 0;
+  while (changed && pass < 3) {
+    changed = false;
+    pass += 1;
+    for (let left = 1; left < improved.length - 2; left += 1) {
+      for (let right = left + 1; right < improved.length - 1; right += 1) {
+        const oldCost = straightDistance(points[improved[left - 1]], points[improved[left]]) + straightDistance(points[improved[right]], points[improved[right + 1]]);
+        const newCost = straightDistance(points[improved[left - 1]], points[improved[right]]) + straightDistance(points[improved[left]], points[improved[right + 1]]);
+        if (newCost + 0.01 < oldCost) {
+          improved.splice(left, right - left + 1, ...improved.slice(left, right + 1).reverse());
+          changed = true;
+        }
+      }
+    }
+  }
+  return improved;
+}
+
+export async function calculateOfflineRoute(points, returnStart = false) {
+  const graph = await loadGraph();
+  const snapped = points.map((point) => nearestNode(graph, Number(point.lat), Number(point.lon)));
+  const initialOrder = greedyOrder(graph, snapped);
+  const baseline = routeForOrder(graph, snapped, initialOrder, returnStart);
+  const candidateOrder = improveOrder2Opt(points, initialOrder);
+  let chosen = baseline;
+  if (candidateOrder.some((value, index) => value !== initialOrder[index])) {
+    try {
+      const candidate = routeForOrder(graph, snapped, candidateOrder, returnStart);
+      if (candidate.distance < baseline.distance) chosen = candidate;
+    } catch { /* păstrează ordinea sigură găsită de euristica inițială */ }
+  }
+  const coordinates = chosen.geometry.map((index) => [graph.nodes[index][1], graph.nodes[index][0]]);
+  return { order: chosen.order, distance: chosen.distance, duration: chosen.distance / 8.3, geometry: { type: 'LineString', coordinates }, provider: 'Offline Devon', snappedMeters: snapped.map((point) => point.distance) };
 }
 
 export async function offlineReady() { await loadGraph(); return true; }
