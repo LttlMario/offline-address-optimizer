@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Offline Address Optimizer</string>
+    <string name="title_activity_main">Offline Address Optimizer</string>
+    <string name="package_name">ro.offlineaddress.optimizer</string>
+    <string name="custom_url_scheme">ro.offlineaddress.optimizer</string>
+</resources>

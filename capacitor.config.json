@@ -1,0 +1,7 @@
+{
+  "appId": "ro.offlineaddress.optimizer",
+  "appName": "Offline Address Optimizer",
+  "webDir": "app",
+  "bundledWebRuntime": false,
+  "server": { "androidScheme": "https" }
+}
