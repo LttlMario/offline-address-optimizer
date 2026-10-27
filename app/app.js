@@ -92,7 +92,7 @@ async function optimize() {
     $('start-address').value = routeStops[0]?.address || '';
     if (finalAddress) $('finish-address').value = routeStops.at(-1)?.address || '';
     if (routeLayer) routeLayer.remove(); routeLayer = L.geoJSON(result.geometry, { style: { color: '#31e0ad', weight: 5, opacity: .9 } }).addTo(map); map.fitBounds(routeLayer.getBounds(), { padding: [18, 18] });
-    $('notice').className = 'notice ok'; $('notice').textContent = `Traseu offline calculat: ${(result.distance / 1000).toFixed(2)} km, aproximativ ${(result.duration / 60).toFixed(0)} minute.`; renderStops();
+    $('notice').className = 'notice ok'; $('notice').textContent = `Traseu offline calculat: ${(result.distance / 1000).toFixed(2)} km, aproximativ ${Math.max(1, Math.round(result.duration / 60))} ${Math.max(1, Math.round(result.duration / 60)) === 1 ? 'minut' : 'minute'}.`; renderStops();
   } catch (error) { $('notice').className = 'notice error'; $('notice').textContent = error.message; }
 }
 
