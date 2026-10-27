@@ -34,6 +34,14 @@ async function loadGraph() {
     });
     graph.addressesNormalized = graph.addresses.map((address) => ({ ...address, key: normalize(`${address.n} ${address.s} ${address.p} ${address.c}`) }));
     graph.addressByKey = new Map(graph.addressesNormalized.map((address) => [address.key, address]));
+    graph.addressesByPostcode = new Map();
+    for (const address of graph.addressesNormalized) {
+      const key = normalize(address.p).replace(/\s/g, '');
+      if (!key) continue;
+      const bucket = graph.addressesByPostcode.get(key) || [];
+      bucket.push(address);
+      graph.addressesByPostcode.set(key, bucket);
+    }
     return graph;
   });
   return graphPromise;
@@ -128,13 +136,13 @@ export async function resolveOfflineAddress(input) {
   return { lat, lon, input, display_name: displayName, postcode: exact.p || '', city: exact.c || 'Devon', countryCode: 'gb', needsReview: false, offline: true };
 }
 
-export async function searchOfflineAddresses(input, limit = 8) {
+export async function searchOfflineAddresses(input, limit = 8, options = {}) {
   const graph = await loadGraph();
   const query = normalize(input);
   if (query.length < 3) return [];
   const toResult = (address) => { const [lat, lon] = graph.nodes[address.i]; const displayName = [address.n, address.s, address.p, address.c].filter(Boolean).join(', '); return { input: displayName, display_name: displayName, lat, lon, street: address.s, number: address.n, postcode: address.p, city: address.c }; };
   const postcodeQuery = query.replace(/\s/g, '');
-  const postcodeMatches = graph.addressesNormalized.filter((address) => normalize(address.p).replace(/\s/g, '') === postcodeQuery);
+  const postcodeMatches = graph.addressesByPostcode.get(postcodeQuery) || [];
   if (postcodeMatches.length) return postcodeMatches.sort((a, b) => String(a.n).localeCompare(String(b.n), undefined, { numeric: true })).map((address) => ({ ...toResult(address), matchType: 'postcode-exact' })).slice(0, Math.max(limit, postcodeMatches.length));
   const postcodeData = await loadOfflinePostcodes();
   const postcodePoint = postcodeData.byKey.get(postcodeQuery);
@@ -145,6 +153,7 @@ export async function searchOfflineAddresses(input, limit = 8) {
     return prefixMatches.sort((a, b) => String(a.p).localeCompare(String(b.p)) || String(a.n).localeCompare(String(b.n), undefined, { numeric: true })).map((address) => ({ ...toResult(address), matchType: 'postcode-prefix' })).slice(0, limit);
   }
   const terms = query.split(' ').filter(Boolean);
+  const fuzzy = options.fuzzy !== false;
   const editDistance = (left, right) => {
     const row = Array.from({ length: right.length + 1 }, (_, index) => index);
     for (let i = 1; i <= left.length; i += 1) { let diagonal = row[0]; row[0] = i; for (let j = 1; j <= right.length; j += 1) { const above = row[j]; row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diagonal + (left[i - 1] === right[j - 1] ? 0 : 1)); diagonal = above; } }
@@ -153,7 +162,7 @@ export async function searchOfflineAddresses(input, limit = 8) {
   return graph.addressesNormalized
     .map((address) => {
       const words = address.key.split(' '); let score = 0;
-      for (const term of terms) { if (address.key.includes(term)) score += term.length >= 4 ? 18 : 10; else if (words.some((word) => word.length > 3 && editDistance(term, word) <= (term.length > 6 ? 2 : 1))) score += 6; else return { address, score: 0 }; }
+      for (const term of terms) { if (address.key.includes(term)) score += term.length >= 4 ? 18 : 10; else if (fuzzy && words.some((word) => word.length > 3 && editDistance(term, word) <= (term.length > 6 ? 2 : 1))) score += 6; else return { address, score: 0 }; }
       if (address.key.startsWith(query)) score += 14;
       if (address.p && normalize(address.p) === query) score += 35;
       return { address, score };
