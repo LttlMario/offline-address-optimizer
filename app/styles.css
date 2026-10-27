@@ -3,3 +3,4 @@
 :root{}.results{display:grid;gap:10px;margin-top:14px}.result{border:1px solid #315449;border-radius:12px;padding:12px;background:#10211d}.result strong{display:block}.result small{display:block;color:#9bb9b0;margin-top:5px}.result-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.result-actions button{padding:8px 10px;font-size:.8rem}.result-actions button.primary{color:#08231c}.card input[type=checkbox]{width:auto;margin:0 5px 0 0}.result-select{margin-top:14px}.selected-result{min-height:40px;padding:10px 0;line-height:1.45}.file-button{display:inline-block;cursor:pointer}
 .file-button{display:inline-block;cursor:pointer}
 .single-address{align-items:stretch;margin-bottom:10px}.single-address input{flex:1;margin-bottom:0}.single-address button{white-space:nowrap}
+.online-fallback{display:inline-block;color:#9bb9b0;font-size:.82rem;margin-top:5px}
