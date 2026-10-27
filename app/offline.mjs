@@ -123,7 +123,12 @@ export async function searchOfflineAddresses(input, limit = 8) {
   const toResult = (address) => { const [lat, lon] = graph.nodes[address.i]; const displayName = [address.n, address.s, address.p, address.c].filter(Boolean).join(', '); return { input: displayName, display_name: displayName, lat, lon, street: address.s, number: address.n, postcode: address.p, city: address.c }; };
   const postcodeQuery = query.replace(/\s/g, '');
   const postcodeMatches = graph.addressesNormalized.filter((address) => normalize(address.p).replace(/\s/g, '') === postcodeQuery);
-  if (postcodeMatches.length) return postcodeMatches.sort((a, b) => String(a.n).localeCompare(String(b.n), undefined, { numeric: true })).map(toResult).slice(0, Math.max(limit, postcodeMatches.length));
+  if (postcodeMatches.length) return postcodeMatches.sort((a, b) => String(a.n).localeCompare(String(b.n), undefined, { numeric: true })).map((address) => ({ ...toResult(address), matchType: 'postcode-exact' })).slice(0, Math.max(limit, postcodeMatches.length));
+  if (/^[a-z]{1,2}\d[a-z\d]?\d[a-z]{2}$/i.test(postcodeQuery)) {
+    const outward = postcodeQuery.slice(0, -3);
+    const prefixMatches = graph.addressesNormalized.filter((address) => normalize(address.p).replace(/\s/g, '').startsWith(outward));
+    return prefixMatches.sort((a, b) => String(a.p).localeCompare(String(b.p)) || String(a.n).localeCompare(String(b.n), undefined, { numeric: true })).map((address) => ({ ...toResult(address), matchType: 'postcode-prefix' })).slice(0, limit);
+  }
   const terms = query.split(' ').filter(Boolean);
   const editDistance = (left, right) => {
     const row = Array.from({ length: right.length + 1 }, (_, index) => index);
