@@ -70,13 +70,18 @@ async function optimize() {
   try {
     const start = startOverride || await resolveOfflineAddress($('start-address').value);
     const finish = $('finish-address').value.trim() ? await resolveOfflineAddress($('finish-address').value) : null;
+    const allPoints = [start, ...stops, ...(finish ? [finish] : [])];
+    const pointKeys = allPoints.map((point) => `${Number(point.lat).toFixed(6)},${Number(point.lon).toFixed(6)}`);
+    const duplicates = pointKeys.filter((key, index) => pointKeys.indexOf(key) !== index);
+    if (duplicates.length) throw new Error('Există adrese cu aceeași locație. Elimină duplicatele înainte de optimizare.');
+    if (allPoints.length > 250) { $('notice').textContent = `Se calculează o rută mare cu ${allPoints.length} puncte; pagina rămâne deschisă până la final.`; }
     const selected = [start, ...stops];
     const result = await calculateOfflineRoute(selected);
     const ordered = result.order.map((index) => selected[index]);
     if (finish) {
       const tail = await calculateOfflineRoute([ordered.at(-1), finish]);
       result.distance += tail.distance; result.duration += tail.duration;
-      result.geometry.coordinates.push(...tail.geometry.coordinates.slice(1));
+      result.geometry.coordinates.push(...(result.geometry.coordinates.length ? tail.geometry.coordinates.slice(1) : tail.geometry.coordinates));
       ordered.push(finish);
     }
     const finalAddress = finish?.display_name;

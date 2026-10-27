@@ -5,3 +5,5 @@ android/app/build/
 android/capacitor-cordova-android-plugins/build/
 android/.idea/
 *.iml
+data/build/
+data/packages/

@@ -32,6 +32,7 @@ async function loadGraph() {
       graph.grid.set(key, bucket);
     });
     graph.addressesNormalized = graph.addresses.map((address) => ({ ...address, key: normalize(`${address.n} ${address.s} ${address.p} ${address.c}`) }));
+    graph.addressByKey = new Map(graph.addressesNormalized.map((address) => [address.key, address]));
     return graph;
   });
   return graphPromise;
@@ -108,7 +109,7 @@ function pathFor(previous, start, end) {
 export async function resolveOfflineAddress(input) {
   const graph = await loadGraph();
   const query = normalize(input);
-  const exact = graph.addressesNormalized.find((address) => address.key === query) || graph.addressesNormalized.find((address) => query.includes(normalize(`${address.n} ${address.s}`)));
+  const exact = graph.addressByKey.get(query) || graph.addressesNormalized.find((address) => query.includes(normalize(`${address.n} ${address.s}`)));
   if (!exact) throw new Error(`Adresa nu există în indexul offline Devon: ${input}. Alege locația direct de pe hartă sau valideaz-o online o singură dată.`);
   const [lat, lon] = graph.nodes[exact.i];
   const displayName = [exact.n, exact.s, exact.p, exact.c].filter(Boolean).join(', ');
