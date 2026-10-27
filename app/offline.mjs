@@ -1,6 +1,7 @@
 let graphPromise;
 let roadsPromise;
 let mapPromise;
+let postcodePromise;
 const OFFLINE_CACHE = 'optimizator-offline-data-v1';
 
 async function cachedOfflineFetch(path) {
@@ -55,6 +56,17 @@ export async function loadOfflineMap() {
     return new Response(stream).json();
   });
   return mapPromise;
+}
+
+export async function loadOfflinePostcodes() {
+  if (postcodePromise) return postcodePromise;
+  postcodePromise = cachedOfflineFetch('./offline-data/devon-postcodes.json.gz').then(async (response) => {
+    const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
+    const payload = await new Response(stream).json();
+    payload.byKey = new Map(payload.postcodes.map((item) => [normalize(item.p).replace(/\s/g, ''), item]));
+    return payload;
+  });
+  return postcodePromise;
 }
 
 function nearestNode(graph, lat, lon) {
@@ -124,6 +136,9 @@ export async function searchOfflineAddresses(input, limit = 8) {
   const postcodeQuery = query.replace(/\s/g, '');
   const postcodeMatches = graph.addressesNormalized.filter((address) => normalize(address.p).replace(/\s/g, '') === postcodeQuery);
   if (postcodeMatches.length) return postcodeMatches.sort((a, b) => String(a.n).localeCompare(String(b.n), undefined, { numeric: true })).map((address) => ({ ...toResult(address), matchType: 'postcode-exact' })).slice(0, Math.max(limit, postcodeMatches.length));
+  const postcodeData = await loadOfflinePostcodes();
+  const postcodePoint = postcodeData.byKey.get(postcodeQuery);
+  if (postcodePoint) return [{ input: postcodePoint.p, display_name: `${postcodePoint.p} · punct postcode (fără adresă individuală)`, lat: postcodePoint.lat, lon: postcodePoint.lon, postcode: postcodePoint.p, city: 'Devon', isPostcodePoint: true, matchType: 'postcode-point' }];
   if (/^[a-z]{1,2}\d[a-z\d]?\d[a-z]{2}$/i.test(postcodeQuery)) {
     const outward = postcodeQuery.slice(0, -3);
     const prefixMatches = graph.addressesNormalized.filter((address) => normalize(address.p).replace(/\s/g, '').startsWith(outward));
