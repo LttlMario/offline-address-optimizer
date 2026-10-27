@@ -153,7 +153,7 @@ export async function searchOfflineAddresses(input, limit = 8, options = {}) {
     return prefixMatches.sort((a, b) => String(a.p).localeCompare(String(b.p)) || String(a.n).localeCompare(String(b.n), undefined, { numeric: true })).map((address) => ({ ...toResult(address), matchType: 'postcode-prefix' })).slice(0, limit);
   }
   const terms = query.split(' ').filter(Boolean);
-  const fuzzy = options.fuzzy !== false;
+  const fuzzy = options.fuzzy !== false && (typeof window === 'undefined' || window.offlineFuzzyEnabled !== false);
   const editDistance = (left, right) => {
     const row = Array.from({ length: right.length + 1 }, (_, index) => index);
     for (let i = 1; i <= left.length; i += 1) { let diagonal = row[0]; row[0] = i; for (let j = 1; j <= right.length; j += 1) { const above = row[j]; row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diagonal + (left[i - 1] === right[j - 1] ? 0 : 1)); diagonal = above; } }
