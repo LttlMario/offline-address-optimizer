@@ -1,9 +1,6 @@
 import { createGunzip } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
-import { promisify } from 'node:util';
-
-const gunzip = promisify(createGunzip);
-async function load(path) { return JSON.parse((await gunzip(await readFile(path))).toString('utf8')); }
+async function load(path) { const input = await readFile(path); return await new Promise((resolve, reject) => { const stream = createGunzip(); const chunks = []; stream.on('data', (chunk) => chunks.push(chunk)); stream.on('end', () => resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))); stream.on('error', reject); stream.end(input); }); }
 async function main() {
   const map = await load('app/offline-data/devon-map.json.gz');
   const graph = await load('app/offline-data/devon-road-graph.json.gz');
