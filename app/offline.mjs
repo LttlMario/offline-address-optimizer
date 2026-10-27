@@ -120,12 +120,23 @@ export async function searchOfflineAddresses(input, limit = 8) {
   const query = normalize(input);
   if (query.length < 3) return [];
   const terms = query.split(' ').filter(Boolean);
+  const editDistance = (left, right) => {
+    const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= left.length; i += 1) { let diagonal = row[0]; row[0] = i; for (let j = 1; j <= right.length; j += 1) { const above = row[j]; row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diagonal + (left[i - 1] === right[j - 1] ? 0 : 1)); diagonal = above; } }
+    return row[right.length];
+  };
   return graph.addressesNormalized
-    .map((address) => ({ address, score: terms.every((term) => address.key.includes(term)) ? terms.length * 10 + (address.key.startsWith(query) ? 5 : 0) : 0 }))
+    .map((address) => {
+      const words = address.key.split(' '); let score = 0;
+      for (const term of terms) { if (address.key.includes(term)) score += term.length >= 4 ? 18 : 10; else if (words.some((word) => word.length > 3 && editDistance(term, word) <= (term.length > 6 ? 2 : 1))) score += 6; else return { address, score: 0 }; }
+      if (address.key.startsWith(query)) score += 14;
+      if (address.p && normalize(address.p) === query) score += 35;
+      return { address, score };
+    })
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || a.address.key.localeCompare(b.address.key))
     .slice(0, limit)
-    .map(({ address }) => ({ input: [address.n, address.s, address.p, address.c].filter(Boolean).join(', '), display_name: [address.n, address.s, address.p, address.c].filter(Boolean).join(', ') }));
+    .map(({ address }) => { const [lat, lon] = graph.nodes[address.i]; const displayName = [address.n, address.s, address.p, address.c].filter(Boolean).join(', '); return { input: displayName, display_name: displayName, lat, lon, street: address.s, number: address.n, postcode: address.p, city: address.c }; });
 }
 
 export async function calculateOfflineRoute(points, returnStart = false) {
