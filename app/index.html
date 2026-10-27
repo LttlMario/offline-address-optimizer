@@ -18,10 +18,11 @@
     </header>
 
     <section class="card controls">
-      <label for="start">Plecare</label>
-      <select id="start"><option value="">Prima adresă introdusă</option></select>
-      <label for="finish">Final</label>
-      <select id="finish"><option value="">Ultima oprire optimizată</option></select>
+      <label for="start-address">Adresă de plecare</label>
+      <input id="start-address" placeholder="Introdu adresa de plecare">
+      <button id="use-location" class="quiet">Folosește locația mea ca plecare</button>
+      <label for="finish-address">Adresă finală</label>
+      <input id="finish-address" placeholder="Introdu ultima adresă — opțional">
       <button id="optimize" class="primary">Optimizează ordinea</button>
       <button id="clear" class="quiet">Golește</button>
       <button id="load-map" class="quiet">Încarcă harta offline</button>
@@ -33,7 +34,7 @@
     </section>
 
     <section class="card">
-      <label for="addresses">Adrese — una pe rând sau lipite în bloc</label>
+      <label for="addresses">Adrese intermediare — una pe rând sau lipite în bloc</label>
       <textarea id="addresses" rows="9" placeholder="Exemplu:&#10;1 Cowick Street, Exeter, EX4 1AL, UK&#10;5 Cowick Street, Exeter, EX4 1AL, UK"></textarea>
       <div class="row"><button id="add">Adaugă adrese</button><span id="status" class="muted">0 adrese</span></div>
     </section>
