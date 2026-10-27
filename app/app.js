@@ -1,4 +1,4 @@
-import { loadOfflineMap, offlineReady, resolveOfflineAddress, calculateOfflineRoute } from './offline.mjs';
+import { loadOfflineMap, offlineReady, resolveOfflineAddress, searchOfflineAddresses, calculateOfflineRoute } from './offline.mjs';
 
 const $ = (id) => document.getElementById(id);
 let stops = [];
@@ -8,6 +8,7 @@ let routeLayer;
 let stopLayer;
 let offlineMap;
 let startOverride = null;
+let suggestionTimer;
 
 function normalize(value) { return value.trim().replace(/\s+/g, ' '); }
 
@@ -59,6 +60,9 @@ async function addAddresses() {
   $('addresses').value = ''; $('notice').className = unresolved ? 'notice error' : 'notice ok'; $('notice').textContent = `${added} adrese adăugate${unresolved ? `; ${unresolved} fără coordonate offline` : ''}.`; renderStops();
 }
 
+async function addSingleAddress() { const input = $('single-address'); const address = normalize(input.value); if (!address) return; $('notice').className = 'notice'; $('notice').textContent = 'Se verifică adresa în indexul offline…'; try { const resolved = await resolveOfflineAddress(address); if (!stops.some((stop) => stop.address.toLocaleLowerCase() === resolved.display_name.toLocaleLowerCase())) stops.push({ address: resolved.display_name, lat: resolved.lat, lon: resolved.lon }); input.value = ''; $('notice').className = 'notice ok'; $('notice').textContent = 'Adresa a fost adăugată.'; renderStops(); } catch (error) { $('notice').className = 'notice error'; $('notice').textContent = error.message; } }
+function updateSuggestions(input) { clearTimeout(suggestionTimer); suggestionTimer = setTimeout(async () => { const query = input.value.trim(); if (query.length < 3) return; try { const items = await searchOfflineAddresses(query, 50); const datalist = $('offline-address-options'); datalist.replaceChildren(...items.slice(0, 50).map((item) => new Option(item.display_name))); } catch { /* adresa poate fi verificată ulterior */ } }, 180); }
+
 async function optimize() {
   if (!startOverride && !$('start-address').value.trim()) { $('notice').className = 'notice error'; $('notice').textContent = 'Adaugă adresa de plecare sau folosește locația mea.'; return; }
   if (!stops.length && !$('finish-address').value.trim()) { $('notice').className = 'notice error'; $('notice').textContent = 'Adaugă cel puțin o adresă intermediară sau o adresă finală.'; return; }
@@ -95,8 +99,8 @@ async function importRoute(file) { const text = await file.text(); let state; if
 initMap();
 try { const pending = JSON.parse(localStorage.getItem('offline-optimizer-pending-addresses') || '[]'); if (Array.isArray(pending)) { stops = pending.map((item) => ({ address: item.display_name, lat: item.lat, lon: item.lon })); localStorage.removeItem('offline-optimizer-pending-addresses'); } } catch { /* stocarea poate fi indisponibilă în mod privat */ }
 $('add').addEventListener('click', addAddresses); $('optimize').addEventListener('click', optimize); $('load-map').addEventListener('click', () => loadMap().catch((error) => { $('map-status').textContent = error.message; }));
+$('add-single').addEventListener('click', addSingleAddress); $('single-address').addEventListener('input', (event) => updateSuggestions(event.target)); $('start-address').addEventListener('input', (event) => { startOverride = null; updateSuggestions(event.target); }); $('finish-address').addEventListener('input', (event) => updateSuggestions(event.target));
 $('download-offline').addEventListener('click', async () => { $('map-status').textContent = 'se descarcă harta și graful offline…'; $('notice').className = 'notice'; $('notice').textContent = 'Lasă pagina deschisă până apare confirmarea.'; try { await Promise.all([loadMap(), offlineReady()]); $('map-status').textContent = 'resurse offline pregătite'; $('notice').className = 'notice ok'; $('notice').textContent = 'Harta, indexul de adrese și graful de rutare sunt salvate pe acest dispozitiv.'; } catch (error) { $('map-status').textContent = 'descărcarea a eșuat'; $('notice').className = 'notice error'; $('notice').textContent = error.message; } });
-$('start-address').addEventListener('input', () => { startOverride = null; });
 $('use-location').addEventListener('click', () => {
   if (!navigator.geolocation) { $('notice').className = 'notice error'; $('notice').textContent = 'Acest telefon/browser nu oferă locație GPS.'; return; }
   $('notice').className = 'notice'; $('notice').textContent = 'Se solicită locația GPS…';
