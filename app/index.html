@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10231f">
+  <title>Offline Address Optimizer</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">OFFLINE ADDRESS OPTIMIZER</p>
+      <h1>Ordine optimă pentru adrese</h1>
+      <p class="muted">Doar adrese și traseu. Fără curier, vehicul sau server obligatoriu.</p>
+    </header>
+
+    <section class="card controls">
+      <label for="start">Plecare</label>
+      <select id="start"><option value="">Prima adresă introdusă</option></select>
+      <label for="finish">Final</label>
+      <select id="finish"><option value="">Ultima oprire optimizată</option></select>
+      <button id="optimize" class="primary">Optimizează ordinea</button>
+      <button id="clear" class="quiet">Golește</button>
+    </section>
+
+    <section class="card">
+      <label for="addresses">Adrese — una pe rând sau lipite în bloc</label>
+      <textarea id="addresses" rows="9" placeholder="Exemplu:&#10;1 Cowick Street, Exeter, EX4 1AL, UK&#10;5 Cowick Street, Exeter, EX4 1AL, UK"></textarea>
+      <div class="row"><button id="add">Adaugă adrese</button><span id="status" class="muted">0 adrese</span></div>
+    </section>
+
+    <section class="card">
+      <div class="row"><h2>Ordinea traseului</h2><span id="summary" class="muted">—</span></div>
+      <ol id="route" class="route"></ol>
+      <p id="notice" class="notice">Pentru optimizare offline, adresele trebuie să aibă coordonate în pachetul local de hartă.</p>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
