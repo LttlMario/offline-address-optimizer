@@ -6,3 +6,4 @@
 .online-fallback{display:inline-block;color:#9bb9b0;font-size:.82rem;margin-top:5px}
 .stop-number-icon{background:transparent;border:0}.stop-number-icon span{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:2px solid #08231c;border-radius:50%;background:#31b58e;color:#06251d;font-weight:900;font-size:14px;box-shadow:0 2px 7px #0008}
 .stop-cluster-icon{background:transparent;border:0}.stop-cluster-icon .cluster-count{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:2px solid #06251d;border-radius:50%;background:#e6b85c;color:#17231f;font-weight:900;font-size:13px;box-shadow:0 2px 7px #0008}
+.optimized-route-line{filter:drop-shadow(0 0 2px #08231c)}

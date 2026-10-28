@@ -223,6 +223,30 @@ function routeForOrder(graph, snapped, order, returnStart = false) {
   return { order: fullOrder, distance, geometry };
 }
 
+function buildRoadDistanceMatrix(graph, snapped) {
+  return snapped.map((from) => {
+    const targets = snapped.map((point) => point.index).filter((index) => index !== from.index);
+    const result = dijkstra(graph, from.index, targets);
+    return snapped.map((to) => to.index === from.index ? 0 : (result.distances.get(to.index) ?? Infinity));
+  });
+}
+
+function improveOrderByRoad(matrix, order) {
+  if (order.length < 4) return order;
+  const improved = order.slice(); let changed = true; let pass = 0;
+  const cost = (candidate) => candidate.slice(0, -1).reduce((sum, from, index) => sum + matrix[from][candidate[index + 1]], 0);
+  while (changed && pass < 6) {
+    changed = false; pass += 1;
+    for (let left = 1; left < improved.length - 2; left += 1) {
+      for (let right = left + 1; right < improved.length - 1; right += 1) {
+        const candidate = improved.slice(); candidate.splice(left, right - left + 1, ...improved.slice(left, right + 1).reverse());
+        if (cost(candidate) + 0.01 < cost(improved)) { improved.splice(0, improved.length, ...candidate); changed = true; }
+      }
+    }
+  }
+  return improved;
+}
+
 function straightDistance(left, right) {
   const dy = (Number(right.lat) - Number(left.lat)) * 110540;
   const dx = (Number(right.lon) - Number(left.lon)) * Math.cos((Number(left.lat) + Number(right.lat)) * Math.PI / 360) * 111320;
@@ -255,8 +279,9 @@ export async function calculateOfflineRoute(points, returnStart = false) {
   const graph = await loadGraph();
   const snapped = points.map((point) => nearestNode(graph, Number(point.lat), Number(point.lon)));
   const initialOrder = greedyOrder(graph, snapped);
+  const roadMatrix = snapped.length <= 40 ? buildRoadDistanceMatrix(graph, snapped) : null;
   const baseline = routeForOrder(graph, snapped, initialOrder, returnStart);
-  const candidateOrder = improveOrder2Opt(points, initialOrder);
+  const candidateOrder = roadMatrix ? improveOrderByRoad(roadMatrix, initialOrder) : improveOrder2Opt(points, initialOrder);
   let chosen = baseline;
   if (candidateOrder.some((value, index) => value !== initialOrder[index])) {
     try {
