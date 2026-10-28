@@ -10,7 +10,7 @@ ALLOWED = {"motorway", "motorway_link", "trunk", "trunk_link", "primary", "prima
 
 class Extract(osmium.SimpleHandler):
     def __init__(self):
-        super().__init__(); self.nodes = {}; self.addresses = []; self.ways = []
+        super().__init__(); self.nodes = {}; self.addresses = []; self.ways = []; self.buildings = []
     def node(self, node):
         if not node.location.valid(): return
         lat, lon = round(float(node.location.lat), 6), round(float(node.location.lon), 6)
@@ -19,6 +19,11 @@ class Extract(osmium.SimpleHandler):
         if tags.get("addr:housenumber") and (tags.get("addr:street") or tags.get("addr:place")):
             self.addresses.append({"n": tags.get("addr:housenumber", ""), "s": tags.get("addr:street") or tags.get("addr:place", ""), "p": tags.get("addr:postcode", ""), "c": tags.get("addr:city") or tags.get("addr:town") or tags.get("addr:village") or tags.get("addr:municipality", ""), "i": node.id})
     def way(self, way):
+        tags = dict(way.tags)
+        if tags.get("building"):
+            refs = [node.ref for node in way.nodes if node.ref in self.nodes]
+            if len(refs) >= 3:
+                self.buildings.append({"r": refs, "t": tags})
         highway = way.tags.get("highway")
         if highway not in ALLOWED: return
         refs = [node.ref for node in way.nodes if node.ref in self.nodes]
@@ -51,10 +56,8 @@ def main():
                 if reverse_edge not in seen: edges[b].append([a, metres]); seen.add(reverse_edge)
     grid = {}
     for node_index, (lat, lon) in enumerate(nodes): grid.setdefault((int(lat * 100), int(lon * 100)), []).append((node_index, lat, lon))
-    addresses = []
-    for source in extract.addresses:
-        if source["i"] not in extract.nodes: continue
-        lat, lon = extract.nodes[source["i"]]; best = None
+    def snap_point(lat, lon):
+        best = None
         for radius in range(0, 10):
             row, col = int(lat * 100), int(lon * 100)
             for rr in range(row - radius, row + radius + 1):
@@ -63,7 +66,34 @@ def main():
                         score = distance((lat, lon), (node_lat, node_lon))
                         if best is None or score < best[0]: best = (score, node_index)
             if best and best[0] < 250: break
-        if best and best[0] <= 2000: addresses.append({k: v for k, v in {**source, "i": best[1]}.items() if k != "id"})
+        return best if best and best[0] <= 2000 else None
+
+    raw_addresses = list(extract.addresses)
+    for building in extract.buildings:
+        tags = building["t"]
+        if not tags.get("addr:housenumber") or not (tags.get("addr:street") or tags.get("addr:place")): continue
+        points = [extract.nodes[node_id] for node_id in building["r"] if node_id in extract.nodes]
+        if len(points) < 3: continue
+        if points[0] == points[-1]: points = points[:-1]
+        lat = sum(point[0] for point in points) / len(points); lon = sum(point[1] for point in points) / len(points)
+        number = tags.get("addr:housenumber", "")
+        unit = tags.get("addr:unit") or tags.get("addr:flats") or ""
+        if unit and unit != number: number = f"{unit}, {number}"
+        raw_addresses.append({"n": number, "s": tags.get("addr:street") or tags.get("addr:place", ""), "p": tags.get("addr:postcode", ""), "c": tags.get("addr:city") or tags.get("addr:town") or tags.get("addr:village") or tags.get("addr:municipality", ""), "lat": lat, "lon": lon, "source": "building"})
+
+    addresses = []; seen_addresses = set()
+    for source in raw_addresses:
+        if "i" in source:
+            if source["i"] not in extract.nodes: continue
+            lat, lon = extract.nodes[source["i"]]
+        else:
+            lat, lon = source["lat"], source["lon"]
+        best = snap_point(lat, lon)
+        if not best: continue
+        identity = (str(source.get("n", "")).strip().lower(), str(source.get("s", "")).strip().lower(), str(source.get("p", "")).strip().lower(), str(source.get("c", "")).strip().lower())
+        if identity in seen_addresses: continue
+        seen_addresses.add(identity)
+        addresses.append({k: v for k, v in {**source, "i": best[1]}.items() if k not in {"id", "lat", "lon"}})
     all_points = nodes; bounds = [min(p[0] for p in all_points), min(p[1] for p in all_points), max(p[0] for p in all_points), max(p[1] for p in all_points)]
     map_payload = {"version": 1, "region": args.region, "bounds": bounds, "roads": roads, "addresses": addresses}
     graph_payload = {"version": 1, "region": args.region, "bounds": bounds, "nodes": nodes, "edges": edges, "addresses": addresses}
