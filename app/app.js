@@ -11,6 +11,7 @@ let stopLayer;
 let offlineMap;
 let startOverride = null;
 let suggestionTimer;
+let optimizing = false;
 
 function normalize(value) { return value.trim().replace(/\s+/g, ' '); }
 
@@ -68,23 +69,29 @@ async function addSingleAddress() { const input = $('single-address'); const add
 function updateSuggestions(input) { clearTimeout(suggestionTimer); suggestionTimer = setTimeout(async () => { const query = input.value.trim(); if (query.length < 3) return; try { const items = await searchOfflineAddresses(query, 50); const datalist = $('offline-address-options'); datalist.replaceChildren(...items.slice(0, 50).map((item) => new Option(item.display_name))); } catch { /* adresa poate fi verificată ulterior */ } }, 180); }
 
 async function optimize() {
+  if (optimizing) return;
   if (!startOverride && !$('start-address').value.trim()) { $('notice').className = 'notice error'; $('notice').textContent = 'Adaugă adresa de plecare sau folosește locația mea.'; return; }
   if (!stops.length && !$('finish-address').value.trim()) { $('notice').className = 'notice error'; $('notice').textContent = 'Adaugă cel puțin o adresă intermediară sau o adresă finală.'; return; }
+  optimizing = true; $('optimize').disabled = true;
   $('notice').className = 'notice'; $('notice').textContent = 'Se calculează traseul pe graful rutier offline…';
   try {
     const start = startOverride || await resolveOfflineAddress($('start-address').value);
     const finish = $('finish-address').value.trim() ? await resolveOfflineAddress($('finish-address').value) : null;
     const allPoints = [start, ...stops, ...(finish ? [finish] : [])];
     const addressKeys = allPoints.map((point) => normalize(point.display_name || point.address || '').toLocaleLowerCase());
-    const duplicateAddresses = addressKeys.filter((key, index) => key && addressKeys.indexOf(key) !== index);
-    if (duplicateAddresses.length) throw new Error('Există aceeași adresă de mai multe ori. Elimină duplicatul înainte de optimizare.');
+    const startKey = addressKeys[0];
+    const finishIsStart = Boolean(finish && addressKeys.at(-1) === startKey);
+    const addressCounts = new Map();
+    addressKeys.filter(Boolean).forEach((key) => addressCounts.set(key, (addressCounts.get(key) || 0) + 1));
+    const duplicateAddresses = addressKeys.some((key, index) => key && addressCounts.get(key) > 1 && !(finishIsStart && (index === 0 || index === addressKeys.length - 1) && key === startKey));
+    if (duplicateAddresses) throw new Error('Există aceeași adresă de mai multe ori în opriri. Elimină duplicatul înainte de optimizare.');
     const pointKeys = allPoints.map((point) => `${Number(point.lat).toFixed(6)},${Number(point.lon).toFixed(6)}`);
     const sharedPoints = pointKeys.filter((key, index) => pointKeys.indexOf(key) !== index).length;
     if (allPoints.length > 250) { $('notice').textContent = `Se calculează o rută mare cu ${allPoints.length} puncte; pagina rămâne deschisă până la final.`; }
     const selected = [start, ...stops];
-    const result = await calculateOfflineRoute(selected);
+    const result = await calculateOfflineRoute(selected, finishIsStart);
     const ordered = result.order.map((index) => selected[index]);
-    if (finish) {
+    if (finish && !finishIsStart) {
       const tail = await calculateOfflineRoute([ordered.at(-1), finish]);
       result.distance += tail.distance; result.duration += tail.duration;
       result.geometry.coordinates.push(...(result.geometry.coordinates.length ? tail.geometry.coordinates.slice(1) : tail.geometry.coordinates));
@@ -97,8 +104,9 @@ async function optimize() {
     if (finalAddress) $('finish-address').value = routeStops.at(-1)?.address || '';
     if (routeLayer) routeLayer.remove(); routeLayer = L.geoJSON(result.geometry, { style: { color: '#31e0ad', weight: 6, opacity: 1, className: 'optimized-route-line' } }).addTo(map); routeLayer.bringToFront(); map.fitBounds(routeLayer.getBounds(), { padding: [18, 18] });
     const sharedMessage = sharedPoints ? ` ${sharedPoints} adrese împart același punct de hartă.` : '';
-    $('notice').className = 'notice ok'; $('notice').textContent = `Traseu offline calculat: ${(result.distance / 1000).toFixed(2)} km, aproximativ ${Math.max(1, Math.round(result.duration / 60))} ${Math.max(1, Math.round(result.duration / 60)) === 1 ? 'minut' : 'minute'}.${sharedMessage}`; renderStops();
-  } catch (error) { $('notice').className = 'notice error'; $('notice').textContent = error.message; }
+    $('notice').className = 'notice ok'; $('notice').textContent = `Traseu offline calculat: ${(result.distance / 1000).toFixed(2)} km, aproximativ ${Math.max(1, Math.round(result.duration / 60))} ${Math.max(1, Math.round(result.duration / 60)) === 1 ? 'minut' : 'minute'}${finishIsStart ? ', cu revenire la adresa finală' : ''}.${sharedMessage}`; renderStops();
+  } catch (error) { $('notice').className = 'notice error'; $('notice').textContent = error.message; $('notice').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  finally { optimizing = false; $('optimize').disabled = false; }
 }
 
 function routeState() { return { version: 1, savedAt: new Date().toISOString(), start: startOverride || { address: $('start-address').value.trim() }, finish: $('finish-address').value.trim(), stops }; }
