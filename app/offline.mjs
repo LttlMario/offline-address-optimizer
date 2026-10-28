@@ -22,7 +22,7 @@ function normalize(value) {
 
 async function loadGraph() {
   if (graphPromise) return graphPromise;
-  graphPromise = cachedOfflineFetch('./offline-data/devon-road-graph.json.gz?v=9').then(async (response) => {
+  graphPromise = cachedOfflineFetch('./offline-data/devon-road-graph.json.gz?v=10').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const graph = await new Response(stream).json();
     graph.grid = new Map();
@@ -66,7 +66,7 @@ async function loadGraph() {
 
 export async function loadOfflineRoads() {
   if (roadsPromise) return roadsPromise;
-  roadsPromise = cachedOfflineFetch('./offline-data/devon-roads-preview.json.gz?v=9').then(async (response) => {
+  roadsPromise = cachedOfflineFetch('./offline-data/devon-roads-preview.json.gz?v=10').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const payload = await new Response(stream).json();
     return { type: 'FeatureCollection', features: (payload.segments || []).map((segment) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: segment.map(([lat, lon]) => [lon, lat]) } })) };
@@ -76,7 +76,7 @@ export async function loadOfflineRoads() {
 
 export async function loadOfflineMap() {
   if (mapPromise) return mapPromise;
-  mapPromise = cachedOfflineFetch('./offline-data/devon-map.json.gz?v=9').then(async (response) => {
+  mapPromise = cachedOfflineFetch('./offline-data/devon-map.json.gz?v=10').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     return new Response(stream).json();
   });
@@ -85,7 +85,7 @@ export async function loadOfflineMap() {
 
 export async function loadOfflinePostcodes() {
   if (postcodePromise) return postcodePromise;
-  postcodePromise = cachedOfflineFetch('./offline-data/devon-postcodes.json.gz?v=9').then(async (response) => {
+  postcodePromise = cachedOfflineFetch('./offline-data/devon-postcodes.json.gz?v=10').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const payload = await new Response(stream).json();
     payload.byKey = new Map(payload.postcodes.map((item) => [normalize(item.p).replace(/\s/g, ''), item]));
@@ -197,9 +197,11 @@ export async function searchOfflineAddresses(input, limit = 8, options = {}) {
 function greedyOrder(graph, snapped) {
   const remaining = new Set(snapped.slice(1).map((_, index) => index + 1));
   const order = [0];
+  const searches = new Map();
   let current = 0;
   while (remaining.size) {
     const result = dijkstra(graph, snapped[current].index, [...remaining].map((index) => snapped[index].index));
+    searches.set(snapped[current].index, result);
     let next = -1;
     let best = Infinity;
     remaining.forEach((index) => { const value = result.distances.get(snapped[index].index) ?? Infinity; if (value < best) { best = value; next = index; } });
@@ -208,17 +210,18 @@ function greedyOrder(graph, snapped) {
     remaining.delete(next);
     current = next;
   }
-  return order;
+  return { order, searches };
 }
 
-function routeForOrder(graph, snapped, order, returnStart = false) {
+function routeForOrder(graph, snapped, order, returnStart = false, searches = null) {
   const geometry = [];
   let distance = 0;
   const fullOrder = returnStart ? [...order, 0] : order.slice();
   for (let index = 0; index < fullOrder.length - 1; index += 1) {
     const from = fullOrder[index];
     const to = fullOrder[index + 1];
-    const result = dijkstra(graph, snapped[from].index, [snapped[to].index]);
+    const cached = searches?.get(snapped[from].index);
+    const result = cached?.distances.has(snapped[to].index) ? cached : dijkstra(graph, snapped[from].index, [snapped[to].index]);
     const segmentDistance = result.distances.get(snapped[to].index) ?? Infinity;
     if (!Number.isFinite(segmentDistance)) throw new Error(returnStart ? 'Nu există drum offline de revenire la plecare.' : 'Nu există legătură rutieră offline între toate locațiile.');
     const segment = pathFor(result.previous, snapped[from].index, snapped[to].index);
@@ -284,14 +287,15 @@ function improveOrder2Opt(points, order) {
 export async function calculateOfflineRoute(points, returnStart = false) {
   const graph = await loadGraph();
   const snapped = points.map((point) => nearestNode(graph, Number(point.lat), Number(point.lon)));
-  const initialOrder = greedyOrder(graph, snapped);
-  const roadMatrix = snapped.length <= 40 ? buildRoadDistanceMatrix(graph, snapped) : null;
-  const baseline = routeForOrder(graph, snapped, initialOrder, returnStart);
+  const greedy = greedyOrder(graph, snapped);
+  const initialOrder = greedy.order;
+  const roadMatrix = snapped.length <= 18 ? buildRoadDistanceMatrix(graph, snapped) : null;
+  const baseline = routeForOrder(graph, snapped, initialOrder, returnStart, greedy.searches);
   const candidateOrder = roadMatrix ? improveOrderByRoad(roadMatrix, initialOrder) : improveOrder2Opt(points, initialOrder);
   let chosen = baseline;
   if (candidateOrder.some((value, index) => value !== initialOrder[index])) {
     try {
-      const candidate = routeForOrder(graph, snapped, candidateOrder, returnStart);
+      const candidate = routeForOrder(graph, snapped, candidateOrder, returnStart, greedy.searches);
       if (candidate.distance < baseline.distance) chosen = candidate;
     } catch { /* păstrează ordinea sigură găsită de euristica inițială */ }
   }

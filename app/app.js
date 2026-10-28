@@ -1,6 +1,6 @@
 import { loadOfflineMap, loadOfflinePostcodes, offlineReady, resolveOfflineAddress, searchOfflineAddresses, calculateOfflineRoute } from './offline.mjs';
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=9').catch(() => {});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=10').catch(() => {});
 
 const $ = (id) => document.getElementById(id);
 let stops = [];
