@@ -44,7 +44,7 @@ function renderStops() {
   const list = $('route'); list.replaceChildren(); stopLayer?.clearLayers();
   stops.forEach((stop, index) => {
     const item = document.createElement('li'); item.textContent = `${index + 1}. ${stop.address}${stop.lat == null ? ' — coordonate lipsă' : ''}`; list.append(item);
-    if (stop.lat != null && map) L.circleMarker([stop.lat, stop.lon], { radius: 6, color: '#10211d', fillColor: '#31b58e', fillOpacity: 1, weight: 2 }).bindTooltip(`${index + 1}. ${stop.address}`).addTo(stopLayer);
+    if (stop.lat != null && map) L.marker([stop.lat, stop.lon], { icon: L.divIcon({ className: 'stop-number-icon', html: `<span>${index + 1}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).bindTooltip(`${index + 1}. ${stop.address}`).addTo(stopLayer);
   });
   $('summary').textContent = stops.length ? `${stops.length} adrese intermediare` : '—'; refreshSelectors();
 }
