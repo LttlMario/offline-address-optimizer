@@ -7,3 +7,5 @@ android/.idea/
 *.iml
 data/build/
 data/packages/
+app/offline-data/devon-addresses-local.json.gz
+data/local-address-source/

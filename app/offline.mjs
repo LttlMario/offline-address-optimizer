@@ -32,6 +32,17 @@ async function loadGraph() {
       bucket.push(index);
       graph.grid.set(key, bucket);
     });
+    try {
+      const localResponse = await cachedOfflineFetch('./offline-data/devon-addresses-local.json.gz?v=local');
+      const localStream = localResponse.body?.pipeThrough ? localResponse.body.pipeThrough(new DecompressionStream('gzip')) : localResponse.body;
+      const localPayload = await new Response(localStream).json();
+      const existing = new Set(graph.addresses.map((address) => normalize(`${address.n} ${address.s} ${address.p} ${address.c}`)));
+      for (const address of localPayload.addresses || []) {
+        const identity = normalize(`${address.n} ${address.s} ${address.p} ${address.c}`);
+        if (!identity || existing.has(identity) || !Number.isFinite(Number(address.lat)) || !Number.isFinite(Number(address.lon))) continue;
+        try { const snapped = nearestNode(graph, Number(address.lat), Number(address.lon)); graph.addresses.push({ ...address, i: snapped.index }); existing.add(identity); } catch { /* ignoră punctele locale din afara grafului Devon */ }
+      }
+    } catch { /* pachetul autorizat este opțional și rămâne local */ }
     graph.addressesNormalized = graph.addresses.map((address) => ({ ...address, key: normalize(`${address.n} ${address.s} ${address.p} ${address.c}`) }));
     graph.addressByKey = new Map(graph.addressesNormalized.map((address) => [address.key, address]));
     graph.addressesByPostcode = new Map();

@@ -7,3 +7,13 @@ py tools/build-region.py --pbf data/build/romania-latest.osm.pbf --region "Româ
 ```
 
 Rezultatul conține harta rutieră, indexul adreselor și graful pentru rutare locală. Fișierele mari se distribuie ca asset-uri de release, nu în istoricul Git.
+
+## Index autorizat local (opțional)
+
+Pentru un CSV/ZIP AddressBase Core sau PAF obținut legal, generează pachetul privat:
+
+```text
+py tools/import-authoritative-addresses.py "C:\\cale\\AddressBaseCore_Devon.csv.zip"
+```
+
+Fișierul rezultat `app/offline-data/devon-addresses-local.json.gz` este ignorat de git și nu este publicat. La rularea locală, aplicația îl combină cu indexul OSM și îl folosește pentru căutare și rutare offline.
