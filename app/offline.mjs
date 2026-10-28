@@ -22,7 +22,7 @@ function normalize(value) {
 
 async function loadGraph() {
   if (graphPromise) return graphPromise;
-  graphPromise = cachedOfflineFetch('./offline-data/devon-road-graph.json.gz?v=7').then(async (response) => {
+  graphPromise = cachedOfflineFetch('./offline-data/devon-road-graph.json.gz?v=8').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const graph = await new Response(stream).json();
     graph.grid = new Map();
@@ -33,14 +33,20 @@ async function loadGraph() {
       graph.grid.set(key, bucket);
     });
     try {
-      const localResponse = await cachedOfflineFetch('./offline-data/devon-addresses-local.json.gz?v=local');
-      const localStream = localResponse.body?.pipeThrough ? localResponse.body.pipeThrough(new DecompressionStream('gzip')) : localResponse.body;
-      const localPayload = await new Response(localStream).json();
-      const existing = new Set(graph.addresses.map((address) => normalize(`${address.n} ${address.s} ${address.p} ${address.c}`)));
-      for (const address of localPayload.addresses || []) {
-        const identity = normalize(`${address.n} ${address.s} ${address.p} ${address.c}`);
-        if (!identity || existing.has(identity) || !Number.isFinite(Number(address.lat)) || !Number.isFinite(Number(address.lon))) continue;
-        try { const snapped = nearestNode(graph, Number(address.lat), Number(address.lon)); graph.addresses.push({ ...address, i: snapped.index }); existing.add(identity); } catch { /* ignoră punctele locale din afara grafului Devon */ }
+      // Pachetul AddressBase/PAF este opțional și nu este publicat. Îl citim
+      // doar dacă a fost instalat în cache de utilizator, ca să nu generăm
+      // cereri 404 în aplicația publică și în modul offline.
+      const localUrl = './offline-data/devon-addresses-local.json.gz?v=local';
+      const localResponse = 'caches' in window ? await caches.match(localUrl) : null;
+      if (localResponse?.ok) {
+        const localStream = localResponse.body?.pipeThrough ? localResponse.body.pipeThrough(new DecompressionStream('gzip')) : localResponse.body;
+        const localPayload = await new Response(localStream).json();
+        const existing = new Set(graph.addresses.map((address) => normalize(`${address.n} ${address.s} ${address.p} ${address.c}`)));
+        for (const address of localPayload.addresses || []) {
+          const identity = normalize(`${address.n} ${address.s} ${address.p} ${address.c}`);
+          if (!identity || existing.has(identity) || !Number.isFinite(Number(address.lat)) || !Number.isFinite(Number(address.lon))) continue;
+          try { const snapped = nearestNode(graph, Number(address.lat), Number(address.lon)); graph.addresses.push({ ...address, i: snapped.index }); existing.add(identity); } catch { /* ignoră punctele locale din afara grafului Devon */ }
+        }
       }
     } catch { /* pachetul autorizat este opțional și rămâne local */ }
     graph.addressesNormalized = graph.addresses.map((address) => ({ ...address, key: normalize(`${address.n} ${address.s} ${address.p} ${address.c}`) }));
@@ -60,7 +66,7 @@ async function loadGraph() {
 
 export async function loadOfflineRoads() {
   if (roadsPromise) return roadsPromise;
-  roadsPromise = cachedOfflineFetch('./offline-data/devon-roads-preview.json.gz?v=7').then(async (response) => {
+  roadsPromise = cachedOfflineFetch('./offline-data/devon-roads-preview.json.gz?v=8').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const payload = await new Response(stream).json();
     return { type: 'FeatureCollection', features: (payload.segments || []).map((segment) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: segment.map(([lat, lon]) => [lon, lat]) } })) };
@@ -70,7 +76,7 @@ export async function loadOfflineRoads() {
 
 export async function loadOfflineMap() {
   if (mapPromise) return mapPromise;
-  mapPromise = cachedOfflineFetch('./offline-data/devon-map.json.gz?v=7').then(async (response) => {
+  mapPromise = cachedOfflineFetch('./offline-data/devon-map.json.gz?v=8').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     return new Response(stream).json();
   });
@@ -79,7 +85,7 @@ export async function loadOfflineMap() {
 
 export async function loadOfflinePostcodes() {
   if (postcodePromise) return postcodePromise;
-  postcodePromise = cachedOfflineFetch('./offline-data/devon-postcodes.json.gz?v=7').then(async (response) => {
+  postcodePromise = cachedOfflineFetch('./offline-data/devon-postcodes.json.gz?v=8').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const payload = await new Response(stream).json();
     payload.byKey = new Map(payload.postcodes.map((item) => [normalize(item.p).replace(/\s/g, ''), item]));
