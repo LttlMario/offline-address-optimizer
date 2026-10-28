@@ -22,7 +22,7 @@ function normalize(value) {
 
 async function loadGraph() {
   if (graphPromise) return graphPromise;
-  graphPromise = cachedOfflineFetch('./offline-data/devon-road-graph.json.gz?v=10').then(async (response) => {
+  graphPromise = cachedOfflineFetch('./offline-data/devon-road-graph.json.gz?v=11').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const graph = await new Response(stream).json();
     graph.grid = new Map();
@@ -66,7 +66,7 @@ async function loadGraph() {
 
 export async function loadOfflineRoads() {
   if (roadsPromise) return roadsPromise;
-  roadsPromise = cachedOfflineFetch('./offline-data/devon-roads-preview.json.gz?v=10').then(async (response) => {
+  roadsPromise = cachedOfflineFetch('./offline-data/devon-roads-preview.json.gz?v=11').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const payload = await new Response(stream).json();
     return { type: 'FeatureCollection', features: (payload.segments || []).map((segment) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: segment.map(([lat, lon]) => [lon, lat]) } })) };
@@ -76,7 +76,7 @@ export async function loadOfflineRoads() {
 
 export async function loadOfflineMap() {
   if (mapPromise) return mapPromise;
-  mapPromise = cachedOfflineFetch('./offline-data/devon-map.json.gz?v=10').then(async (response) => {
+  mapPromise = cachedOfflineFetch('./offline-data/devon-map.json.gz?v=11').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     return new Response(stream).json();
   });
@@ -85,7 +85,7 @@ export async function loadOfflineMap() {
 
 export async function loadOfflinePostcodes() {
   if (postcodePromise) return postcodePromise;
-  postcodePromise = cachedOfflineFetch('./offline-data/devon-postcodes.json.gz?v=10').then(async (response) => {
+  postcodePromise = cachedOfflineFetch('./offline-data/devon-postcodes.json.gz?v=11').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const payload = await new Response(stream).json();
     payload.byKey = new Map(payload.postcodes.map((item) => [normalize(item.p).replace(/\s/g, ''), item]));
@@ -284,20 +284,47 @@ function improveOrder2Opt(points, order) {
   return improved;
 }
 
+function greedyOrderByStraight(points) {
+  const remaining = new Set(points.slice(1).map((_, index) => index + 1));
+  const order = [0];
+  let current = 0;
+  while (remaining.size) {
+    let next = -1;
+    let best = Infinity;
+    remaining.forEach((index) => {
+      const value = straightDistance(points[current], points[index]);
+      if (value < best) { best = value; next = index; }
+    });
+    if (next < 0) break;
+    order.push(next);
+    remaining.delete(next);
+    current = next;
+  }
+  return order;
+}
+
 export async function calculateOfflineRoute(points, returnStart = false) {
   const graph = await loadGraph();
   const snapped = points.map((point) => nearestNode(graph, Number(point.lat), Number(point.lon)));
-  const greedy = greedyOrder(graph, snapped);
+  const useRoadMatrix = snapped.length <= 18;
+  const greedy = useRoadMatrix ? greedyOrder(graph, snapped) : { order: greedyOrderByStraight(points), searches: null };
   const initialOrder = greedy.order;
-  const roadMatrix = snapped.length <= 18 ? buildRoadDistanceMatrix(graph, snapped) : null;
-  const baseline = routeForOrder(graph, snapped, initialOrder, returnStart, greedy.searches);
+  const roadMatrix = useRoadMatrix ? buildRoadDistanceMatrix(graph, snapped) : null;
   const candidateOrder = roadMatrix ? improveOrderByRoad(roadMatrix, initialOrder) : improveOrder2Opt(points, initialOrder);
-  let chosen = baseline;
-  if (candidateOrder.some((value, index) => value !== initialOrder[index])) {
-    try {
-      const candidate = routeForOrder(graph, snapped, candidateOrder, returnStart, greedy.searches);
-      if (candidate.distance < baseline.distance) chosen = candidate;
-    } catch { /* păstrează ordinea sigură găsită de euristica inițială */ }
+  let chosen;
+  if (!roadMatrix) {
+    // Pentru rute mari alegem o ordine compactă geografic, apoi calculăm
+    // fiecare segment pe drumul real. Nu mai dublăm Dijkstra pentru baseline.
+    chosen = routeForOrder(graph, snapped, candidateOrder, returnStart);
+  } else {
+    const baseline = routeForOrder(graph, snapped, initialOrder, returnStart, greedy.searches);
+    chosen = baseline;
+    if (candidateOrder.some((value, index) => value !== initialOrder[index])) {
+      try {
+        const candidate = routeForOrder(graph, snapped, candidateOrder, returnStart, greedy.searches);
+        if (candidate.distance < baseline.distance) chosen = candidate;
+      } catch { /* păstrează ordinea sigură găsită de euristica inițială */ }
+    }
   }
   const coordinates = chosen.geometry.map((index) => [graph.nodes[index][1], graph.nodes[index][0]]);
   return { order: chosen.order, distance: chosen.distance, duration: chosen.distance / 8.3, geometry: { type: 'LineString', coordinates }, provider: 'Offline Devon', snappedMeters: snapped.map((point) => point.distance) };

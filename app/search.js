@@ -1,6 +1,6 @@
 import { searchOfflineAddresses, loadOfflineMap, loadOfflinePostcodes } from './offline.mjs';
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=10').catch(() => {});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=11').catch(() => {});
 const $ = (id) => document.getElementById(id); let timer; let map; let selectedLayer; let mapData; let results = [];
 function init() { map = L.map('map', { preferCanvas: true }).setView([50.72, -3.53], 9); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map); selectedLayer = L.layerGroup().addTo(map); }
 function showPoint(item, title = item.display_name) { if (!item?.lat) return; selectedLayer.clearLayers(); L.marker([item.lat, item.lon]).bindPopup(title).addTo(selectedLayer).openPopup(); map.setView([item.lat, item.lon], 16); $('map-status').textContent = `${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}`; }
