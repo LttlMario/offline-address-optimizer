@@ -45,25 +45,9 @@ function renderStops() {
   stops.forEach((stop, index) => {
     const item = document.createElement('li'); item.textContent = `${index + 1}. ${stop.address}${stop.lat == null ? ' — coordonate lipsă' : ''}`; list.append(item);
   });
-  if (map && stopLayer) {
-    const zoom = map.getZoom(); const groups = [];
-    stops.forEach((stop, index) => {
-      if (stop.lat == null) return;
-      const point = map.project([stop.lat, stop.lon], zoom); let group = groups.find((candidate) => candidate.some((entry) => point.distanceTo(entry.point) < 34));
-      if (!group) { group = []; groups.push(group); }
-      group.push({ stop, index, point });
-    });
-    groups.forEach((group) => {
-      const centerLat = group.reduce((sum, entry) => sum + Number(entry.stop.lat), 0) / group.length;
-      const centerLon = group.reduce((sum, entry) => sum + Number(entry.stop.lon), 0) / group.length;
-      const numbers = group.map((entry) => entry.index + 1).join(' · ');
-      const label = group.length === 1 ? `${group[0].index + 1}. ${group[0].stop.address}` : `Opriri apropiate: ${numbers}`;
-      const html = group.length === 1 ? `<span>${group[0].index + 1}</span>` : `<span class="cluster-count">${group.length}</span>`;
-      const marker = L.marker([centerLat, centerLon], { icon: L.divIcon({ className: group.length === 1 ? 'stop-number-icon' : 'stop-cluster-icon', html, iconSize: [30, 30], iconAnchor: [15, 15] }) }).bindTooltip(label);
-      if (group.length > 1) marker.on('click', () => map.setView([centerLat, centerLon], Math.min(18, map.getZoom() + 3)));
-      marker.addTo(stopLayer);
-    });
-  }
+  if (map && stopLayer) stops.forEach((stop, index) => {
+    if (stop.lat != null) L.marker([stop.lat, stop.lon], { riseOnHover: true, title: `${index + 1}. ${stop.address}`, icon: L.divIcon({ className: 'stop-number-icon', html: `<span>${index + 1}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] }) }).bindTooltip(`${index + 1}. ${stop.address}`, { direction: 'top', offset: [0, -12] }).addTo(stopLayer);
+  });
   $('summary').textContent = stops.length ? `${stops.length} adrese intermediare` : '—'; refreshSelectors();
 }
 
