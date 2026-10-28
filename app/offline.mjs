@@ -2,7 +2,7 @@ let graphPromise;
 let roadsPromise;
 let mapPromise;
 let postcodePromise;
-const OFFLINE_CACHE = 'optimizator-offline-data-v1';
+const OFFLINE_CACHE = 'optimizator-offline-data-v2';
 
 async function cachedOfflineFetch(path) {
   try {
@@ -22,7 +22,7 @@ function normalize(value) {
 
 async function loadGraph() {
   if (graphPromise) return graphPromise;
-  graphPromise = cachedOfflineFetch('./offline-data/devon-road-graph.json.gz').then(async (response) => {
+  graphPromise = cachedOfflineFetch('./offline-data/devon-road-graph.json.gz?v=7').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const graph = await new Response(stream).json();
     graph.grid = new Map();
@@ -49,7 +49,7 @@ async function loadGraph() {
 
 export async function loadOfflineRoads() {
   if (roadsPromise) return roadsPromise;
-  roadsPromise = cachedOfflineFetch('./offline-data/devon-roads-preview.json.gz').then(async (response) => {
+  roadsPromise = cachedOfflineFetch('./offline-data/devon-roads-preview.json.gz?v=7').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const payload = await new Response(stream).json();
     return { type: 'FeatureCollection', features: (payload.segments || []).map((segment) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: segment.map(([lat, lon]) => [lon, lat]) } })) };
@@ -59,7 +59,7 @@ export async function loadOfflineRoads() {
 
 export async function loadOfflineMap() {
   if (mapPromise) return mapPromise;
-  mapPromise = cachedOfflineFetch('./offline-data/devon-map.json.gz').then(async (response) => {
+  mapPromise = cachedOfflineFetch('./offline-data/devon-map.json.gz?v=7').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     return new Response(stream).json();
   });
@@ -68,7 +68,7 @@ export async function loadOfflineMap() {
 
 export async function loadOfflinePostcodes() {
   if (postcodePromise) return postcodePromise;
-  postcodePromise = cachedOfflineFetch('./offline-data/devon-postcodes.json.gz').then(async (response) => {
+  postcodePromise = cachedOfflineFetch('./offline-data/devon-postcodes.json.gz?v=7').then(async (response) => {
     const stream = response.body?.pipeThrough ? response.body.pipeThrough(new DecompressionStream('gzip')) : response.body;
     const payload = await new Response(stream).json();
     payload.byKey = new Map(payload.postcodes.map((item) => [normalize(item.p).replace(/\s/g, ''), item]));
